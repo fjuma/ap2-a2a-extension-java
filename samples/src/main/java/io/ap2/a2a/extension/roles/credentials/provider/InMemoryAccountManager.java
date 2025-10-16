@@ -1,5 +1,7 @@
 package io.ap2.a2a.extension.roles.credentials.provider;
 
+import jakarta.enterprise.context.ApplicationScoped;
+
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -13,6 +15,7 @@ import io.ap2.a2a.extension.spec.PaymentMethodData;
  *
  * Each 'account' contains a user's payment methods and shipping address.
  */
+@ApplicationScoped
 public class InMemoryAccountManager implements AccountManager{
 
     private final ConcurrentMap<String, Account> accounts = new ConcurrentHashMap<>();

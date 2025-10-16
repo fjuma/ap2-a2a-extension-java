@@ -1,6 +1,7 @@
 package io.ap2.a2a.extension.roles.merchant;
 
 import io.ap2.a2a.extension.spec.CartMandate;
+import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -12,6 +13,7 @@ import java.util.concurrent.ConcurrentMap;
  * This implementation uses concurrent hash maps to provide thread-safe storage
  * for cart mandates and risk data.
  */
+@ApplicationScoped
 public class InMemoryCartMandateStore implements CartMandateStore {
 
     private final ConcurrentMap<String, CartMandate> cartMandateStore = new ConcurrentHashMap<>();
