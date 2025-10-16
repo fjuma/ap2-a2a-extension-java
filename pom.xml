@@ -13,6 +13,11 @@
     <name>AP2 A2A Extension Java</name>
     <description>Java A2A Extension for the Agent Payments Protocol (AP2)</description>
 
+    <modules>
+        <module>spec</module>
+        <module>samples</module>
+    </modules>
+
     <url>https://github.com/fjuma/ap2-a2a-extension-java</url>
     <licenses>
         <license>
@@ -43,35 +48,34 @@
     </properties>
 
     <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.github.a2asdk</groupId>
+                <artifactId>a2a-java-sdk-client</artifactId>
+                <version>${io.github.a2asdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.a2asdk</groupId>
+                <artifactId>a2a-java-sdk-common</artifactId>
+                <version>${io.github.a2asdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.a2asdk</groupId>
+                <artifactId>a2a-java-sdk-server-common</artifactId>
+                <version>${io.github.a2asdk.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.core</groupId>
+                <artifactId>jackson-databind</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.fasterxml.jackson.datatype</groupId>
+                <artifactId>jackson-datatype-jsr310</artifactId>
+                <version>${jackson.version}</version>
+            </dependency>
+        </dependencies>
     </dependencyManagement>
-
-    <dependencies>
-        <dependency>
-            <groupId>io.github.a2asdk</groupId>
-            <artifactId>a2a-java-sdk-client</artifactId>
-            <version>${io.github.a2asdk.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.a2asdk</groupId>
-            <artifactId>a2a-java-sdk-common</artifactId>
-            <version>${io.github.a2asdk.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.a2asdk</groupId>
-            <artifactId>a2a-java-sdk-server-common</artifactId>
-            <version>${io.github.a2asdk.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.datatype</groupId>
-            <artifactId>jackson-datatype-jsr310</artifactId>
-            <version>${jackson.version}</version>
-        </dependency>
-    </dependencies>
 
     <build>
         <pluginManagement>
