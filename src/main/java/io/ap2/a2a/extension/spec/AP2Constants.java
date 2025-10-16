@@ -10,5 +10,7 @@ public class AP2Constants {
 
     public static final String CART_MANDATE_DATA_KEY = "ap2.mandates.CartMandate";
 
+    public static final String INTENT_MANDATE_DATA_KEY = "ap2.mandates.IntentMandate";
+
     public static final String EXTENSION_URI = "https://ap2.io/a2a/extensions/v1";
 }
