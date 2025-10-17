@@ -12,6 +12,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+import dev.langchain4j.agent.tool.Tool;
 import io.a2a.client.Client;
 import io.a2a.client.ClientEvent;
 import io.a2a.client.TaskEvent;
@@ -24,16 +25,38 @@ import io.ap2.a2a.extension.common.ArtifactUtils;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.CartMandate;
 import io.ap2.a2a.extension.spec.IntentMandate;
+import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Tools used by the shopper subagent.
  * <p>
  * Each agent uses individual tools to handle distinct tasks throughout the
  * shopping and purchasing process.
+ * <p>
+ * This class provides LangChain4j @Tool annotated methods for AI agent invocation.
  */
+@ApplicationScoped
 public class Tools {
 
     private static final Logger logger = Logger.getLogger(Tools.class.getName());
+
+    private Map<String, Object> state;
+    private Client merchantClient;
+    private boolean debugMode;
+
+    /**
+     * Initializes the tools with required context.
+     * Must be called before tools can be invoked by the AI agent.
+     *
+     * @param state the shared state map
+     * @param merchantClient the merchant agent client
+     * @param debugMode whether debug mode is enabled
+     */
+    public void initialize(Map<String, Object> state, Client merchantClient, boolean debugMode) {
+        this.state = state;
+        this.merchantClient = merchantClient;
+        this.debugMode = debugMode;
+    }
 
     /**
      * Creates an IntentMandate object.
@@ -43,16 +66,15 @@ public class Tools {
      * @param merchants A list of allowed merchants.
      * @param skus A list of allowed SKUs.
      * @param requiresRefundability If the items must be refundable.
-     * @param state The state map for managing tool context.
      * @return An IntentMandate object valid for 1 day.
      */
+    @Tool("Create an IntentMandate that captures the user's shopping intent")
     public IntentMandate createIntentMandate(
             String naturalLanguageDescription,
             boolean userCartConfirmationRequired,
             List<String> merchants,
             List<String> skus,
-            boolean requiresRefundability,
-            Map<String, Object> state) {
+            boolean requiresRefundability) {
 
         Instant intentExpiry = Instant.now().plus(1, ChronoUnit.DAYS);
 
@@ -72,25 +94,19 @@ public class Tools {
     /**
      * Calls the merchant agent to find products matching the user's intent.
      *
-     * @param state The state map for managing tool context.
-     * @param merchantClient The merchant agent client.
-     * @param debugMode Whether the agent is in debug mode.
      * @return A list of CartMandate objects.
-     * @throws AP2Exception if required state is missing or operation fails
      */
-    public List<CartMandate> findProducts(
-            Map<String, Object> state,
-            Client merchantClient,
-            boolean debugMode) throws AP2Exception {
+    @Tool("Find products from the merchant that match the user's intent")
+    public List<CartMandate> findProducts() {
 
         IntentMandate intentMandate = (IntentMandate) state.get("intent_mandate");
         if (intentMandate == null) {
-            throw new AP2Exception("No IntentMandate found in tool context state.");
+            throw new RuntimeException("No IntentMandate found in tool context state.");
         }
 
         String riskData = collectRiskData(state);
         if (riskData == null) {
-            throw new AP2Exception("No risk data found in tool context state.");
+            throw new RuntimeException("No risk data found in tool context state.");
         }
 
         A2aMessageBuilder messageBuilder = new A2aMessageBuilder()
@@ -123,11 +139,11 @@ public class Tools {
         try {
             merchantClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
-            throw new AP2Exception("Failed to find products: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to find products: " + e.getMessage(), e);
         }
 
         if (statusHolder[0] == null || !"completed".equals(statusHolder[0].state().asString())) {
-            throw new AP2Exception("Failed to find products: " + statusHolder[0]);
+            throw new RuntimeException("Failed to find products: " + statusHolder[0]);
         }
 
         state.put("shopping_context_id", contextIdHolder[0]);
@@ -140,10 +156,10 @@ public class Tools {
      * Updates the chosen CartMandate in the tool context state.
      *
      * @param cartId The ID of the chosen cart.
-     * @param state The state map for managing tool context.
      * @return A status message.
      */
-    public String updateChosenCartMandate(String cartId, Map<String, Object> state) {
+    @Tool("Update the chosen cart with the cart ID selected by the user")
+    public String updateChosenCartMandate(String cartId) {
         List<CartMandate> cartMandates = (List<CartMandate>) state.get("cart_mandates");
         if (cartMandates == null) {
             cartMandates = new ArrayList<>();

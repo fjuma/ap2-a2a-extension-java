@@ -14,6 +14,9 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
 import io.a2a.client.Client;
 import io.a2a.client.ClientEvent;
 import io.a2a.client.TaskEvent;
@@ -29,6 +32,9 @@ import io.ap2.a2a.extension.spec.ContactAddress;
 import io.ap2.a2a.extension.spec.PaymentMandate;
 import io.ap2.a2a.extension.spec.PaymentMandateContents;
 import io.ap2.a2a.extension.spec.PaymentResponse;
+import io.ap2.a2a.extension.roles.shopping.subagents.payment.method.collector.PaymentMethodCollectorAgent;
+import io.ap2.a2a.extension.roles.shopping.subagents.shipping.address.collector.ShippingAddressCollectorAgent;
+import io.ap2.a2a.extension.roles.shopping.subagents.shopper.ShopperAgent;
 
 /**
  * Tools used by the Shopping Agent.
@@ -36,9 +42,49 @@ import io.ap2.a2a.extension.spec.PaymentResponse;
  * Each agent uses individual tools to handle distinct tasks throughout the
  * shopping and purchasing process, such as updating a cart or initiating payment.
  */
+@ApplicationScoped
 public class Tools {
 
     private static final Logger logger = Logger.getLogger(Tools.class.getName());
+
+    @Inject
+    ShopperAgent shopperAgent;
+
+    @Inject
+    ShippingAddressCollectorAgent shippingAddressCollectorAgent;
+
+    @Inject
+    PaymentMethodCollectorAgent paymentMethodCollectorAgent;
+
+    /**
+     * Delegates to the shopper agent to help the user shop for products.
+     *
+     * @param assignment the shopping task assignment
+     * @return the result from the shopper agent
+     */
+    public String shopper(String assignment) {
+        return shopperAgent.shopForProducts(assignment);
+    }
+
+    /**
+     * Delegates to the shipping address collector agent to collect the user's shipping address.
+     *
+     * @param assignment the shipping address collection task assignment
+     * @return the shipping address from the agent
+     */
+    public String shippingAddressCollector(String assignment) {
+        return shippingAddressCollectorAgent.collectShippingAddress(assignment);
+    }
+
+    /**
+     * Delegates to the payment method collector agent to collect the user's payment method.
+     *
+     * @param assignment the payment method collection task assignment
+     * @return the payment method alias from the agent
+     */
+    public String paymentMethodCollector(String assignment) {
+        return paymentMethodCollectorAgent.collectPaymentMethod(assignment);
+    }
 
     /**
      * Notifies the merchant agent of a shipping address selection for a cart.

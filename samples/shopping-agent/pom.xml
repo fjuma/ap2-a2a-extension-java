@@ -33,6 +33,12 @@
             <artifactId>quarkus-langchain4j-ai-gemini</artifactId>
             <version>${quarkus.langchain4j.version}</version>
         </dependency>
+
+        <!-- Quarkus REST for HTTP endpoints -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

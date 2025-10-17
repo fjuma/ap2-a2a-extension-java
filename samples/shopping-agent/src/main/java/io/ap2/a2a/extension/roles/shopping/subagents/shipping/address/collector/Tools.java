@@ -9,6 +9,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+import dev.langchain4j.agent.tool.Tool;
 import io.a2a.client.Client;
 import io.a2a.client.ClientEvent;
 import io.a2a.client.TaskEvent;
@@ -19,30 +20,44 @@ import io.ap2.a2a.extension.common.A2aMessageBuilder;
 import io.ap2.a2a.extension.common.ArtifactUtils;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.ContactAddress;
+import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Tools used by the shipping address collector subagent.
  * <p>
  * Each agent uses individual tools to handle distinct tasks throughout the
  * shopping and purchasing process.
+ * <p>
+ * This class provides LangChain4j @Tool annotated methods for AI agent invocation.
  */
+@ApplicationScoped
 public class Tools {
 
     private static final Logger logger = Logger.getLogger(Tools.class.getName());
+
+    private Map<String, Object> state;
+    private Client credentialsProviderClient;
+
+    /**
+     * Initializes the tools with required context.
+     * Must be called before tools can be invoked by the AI agent.
+     *
+     * @param state the shared state map
+     * @param credentialsProviderClient the credentials provider client
+     */
+    public void initialize(Map<String, Object> state, Client credentialsProviderClient) {
+        this.state = state;
+        this.credentialsProviderClient = credentialsProviderClient;
+    }
 
     /**
      * Gets the user's shipping address from the credentials provider.
      *
      * @param userEmail The ID of the user to get the shipping address for.
-     * @param state The state map for managing tool context.
-     * @param credentialsProviderClient The credentials provider client.
      * @return The user's shipping address.
-     * @throws AP2Exception if operation fails
      */
-    public ContactAddress getShippingAddress(
-            String userEmail,
-            Map<String, Object> state,
-            Client credentialsProviderClient) throws AP2Exception {
+    @Tool("Get the user's shipping address from their digital wallet")
+    public ContactAddress getShippingAddress(String userEmail) {
 
         String shoppingContextId = (String) state.get("shopping_context_id");
 
@@ -73,11 +88,11 @@ public class Tools {
         try {
             credentialsProviderClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
-            throw new AP2Exception("Failed to get shipping address: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to get shipping address: " + e.getMessage(), e);
         }
 
         if (addressHolder[0] == null) {
-            throw new AP2Exception("Failed to get shipping address.");
+            throw new RuntimeException("Failed to get shipping address.");
         }
 
         return addressHolder[0];

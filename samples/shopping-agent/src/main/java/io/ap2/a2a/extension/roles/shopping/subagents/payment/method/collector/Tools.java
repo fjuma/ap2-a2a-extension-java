@@ -9,6 +9,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
+import dev.langchain4j.agent.tool.Tool;
 import io.a2a.client.Client;
 import io.a2a.client.ClientEvent;
 import io.a2a.client.TaskEvent;
@@ -21,16 +22,36 @@ import io.ap2.a2a.extension.common.A2aMessageBuilder;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.CartMandate;
 import io.ap2.a2a.extension.spec.PaymentMethodData;
+import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * Tools used by the payment method collector subagent.
  * <p>
  * Each agent uses individual tools to handle distinct tasks throughout the
  * shopping and purchasing process.
+ * <p>
+ * This class provides both the core tool implementations and LangChain4j
+ * @Tool annotated wrappers for AI agent invocation.
  */
+@ApplicationScoped
 public class Tools {
 
     private static final Logger logger = Logger.getLogger(Tools.class.getName());
+
+    private Map<String, Object> state;
+    private Client credentialsProviderClient;
+
+    /**
+     * Initializes the tools with required context.
+     * Must be called before tools can be invoked by the AI agent.
+     *
+     * @param state the shared state map
+     * @param credentialsProviderClient the credentials provider client
+     */
+    public void initialize(Map<String, Object> state, Client credentialsProviderClient) {
+        this.state = state;
+        this.credentialsProviderClient = credentialsProviderClient;
+    }
 
     /**
      * Gets the user's payment methods from the credentials provider.
@@ -38,19 +59,14 @@ public class Tools {
      * These will match the payment method on the cart being purchased.
      *
      * @param userEmail The user's email address.
-     * @param state The state map for managing tool context.
-     * @param credentialsProviderClient The credentials provider client.
      * @return A list of the user's applicable payment method aliases.
-     * @throws AP2Exception if required state is missing or operation fails
      */
-    public List<String> getPaymentMethods(
-            String userEmail,
-            Map<String, Object> state,
-            Client credentialsProviderClient) throws AP2Exception {
+    @Tool("Get eligible payment methods for the user that match the cart's payment method requirements")
+    public List<String> getPaymentMethods(String userEmail) {
 
         CartMandate cartMandate = (CartMandate) state.get("cart_mandate");
         if (cartMandate == null) {
-            throw new AP2Exception("No cart mandate found in tool context state.");
+            throw new RuntimeException("No cart mandate found in tool context state.");
         }
 
         String shoppingContextId = (String) state.get("shopping_context_id");
@@ -92,11 +108,11 @@ public class Tools {
         try {
             credentialsProviderClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
-            throw new AP2Exception("Failed to get payment methods: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to get payment methods: " + e.getMessage(), e);
         }
 
         if (paymentMethodsHolder[0] == null) {
-            throw new AP2Exception("Failed to get payment methods.");
+            throw new RuntimeException("Failed to get payment methods.");
         }
 
         return paymentMethodsHolder[0];
@@ -107,16 +123,12 @@ public class Tools {
      *
      * @param userEmail The user's email address.
      * @param paymentMethodAlias The payment method alias.
-     * @param state The state map for managing tool context.
-     * @param credentialsProviderClient The credentials provider client.
      * @return A map with status and token information.
-     * @throws AP2Exception if required state is missing or operation fails
      */
+    @Tool("Get a payment credential token for the user's selected payment method")
     public Map<String, Object> getPaymentCredentialToken(
             String userEmail,
-            String paymentMethodAlias,
-            Map<String, Object> state,
-            Client credentialsProviderClient) throws AP2Exception {
+            String paymentMethodAlias) {
 
         String shoppingContextId = (String) state.get("shopping_context_id");
 
@@ -158,11 +170,11 @@ public class Tools {
         try {
             credentialsProviderClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
-            throw new AP2Exception("Failed to get payment credential token: " + e.getMessage(), e);
+            throw new RuntimeException("Failed to get payment credential token: " + e.getMessage(), e);
         }
 
         if (tokenHolder[0] == null) {
-            throw new AP2Exception("Failed to get payment credential token.");
+            throw new RuntimeException("Failed to get payment credential token.");
         }
 
         Map<String, Object> paymentCredentialToken = Map.of(
