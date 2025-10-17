@@ -1,4 +1,4 @@
-package io.ap2.a2a.extension.roles.merchant_payment_processor;
+package io.ap2.a2a.extension.roles.merchant.payment.processor;
 
 import static io.ap2.a2a.extension.spec.AP2Constants.EXTENSION_URI;
 import static io.ap2.a2a.extension.spec.AP2Constants.PAYMENT_MANDATE_DATA_KEY;

@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.logging.Logger;
 
 import io.a2a.client.Client;
@@ -68,8 +67,6 @@ public class Tools {
      * @param updater The TaskUpdater instance to add artifacts and complete the task.
      * @param currentTask The current task -- not used in this function.
      * @param cartMandateStore The cart mandate store for retrieving and storing cart mandates.
-     * @param shippingAndTaxCalculator A function that takes a ContactAddress and returns a list
-     *                                 of PaymentItems representing shipping and tax costs.
      * @param debugMode Whether the agent is in debug mode.
      * @throws AP2Exception if required data is missing or invalid
      */
@@ -78,7 +75,6 @@ public class Tools {
             TaskUpdater updater,
             Task currentTask,
             CartMandateStore cartMandateStore,
-            Function<ContactAddress, List<PaymentItem>> shippingAndTaxCalculator,
             boolean debugMode) throws AP2Exception {
 
         String cartId = (String) MessageUtils.findDataPart("cart_id", dataParts);
@@ -122,8 +118,21 @@ public class Tools {
                     shippingAddress
             );
 
-            // Calculate shipping and tax costs based on the shipping address
-            List<PaymentItem> taxAndShippingCosts = shippingAndTaxCalculator.apply(shippingAddress);
+            // Add new shipping and tax costs to the PaymentRequest (hardcoded as in Python)
+            List<PaymentItem> taxAndShippingCosts = List.of(
+                    new PaymentItem(
+                            "Shipping",
+                            new PaymentCurrencyAmount("USD", 2.00),
+                            null,
+                            null
+                    ),
+                    new PaymentItem(
+                            "Tax",
+                            new PaymentCurrencyAmount("USD", 1.50),
+                            null,
+                            null
+                    )
+            );
 
             PaymentDetailsInit oldDetails = updatedPaymentRequest.details();
             List<PaymentItem> displayItems = new ArrayList<>(oldDetails.displayItems());

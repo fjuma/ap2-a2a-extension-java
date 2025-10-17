@@ -1,21 +1,26 @@
 package io.ap2.a2a.extension.roles.merchant;
 
+import io.a2a.client.Client;
 import io.a2a.server.PublicAgentCard;
 import io.a2a.server.agentexecution.AgentExecutor;
 import io.a2a.server.tasks.TaskUpdater;
 import io.a2a.spec.AgentCard;
 import io.a2a.spec.AgentExtension;
 import io.a2a.spec.DataPart;
+import io.a2a.spec.Message;
 import io.a2a.spec.Task;
 import io.a2a.spec.TextPart;
 import io.ap2.a2a.extension.common.BaseAgentExecutor;
 import io.ap2.a2a.extension.common.MessageUtils;
 import io.ap2.a2a.extension.spec.AP2Exception;
+import io.ap2.a2a.extension.roles.merchant.subagents.CatalogAgent;
+import io.ap2.a2a.extension.roles.merchant.subagents.ItemGenerator;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.logging.Logger;
 
 /**
@@ -48,6 +53,12 @@ public final class MerchantAgentExecutorProducer {
     MerchantAgent agent;
 
     /**
+     * The LangChain4j agent for generating product items.
+     */
+    @Inject
+    ItemGenerator itemGenerator;
+
+    /**
      * The agent card.
      */
     @Inject
@@ -61,10 +72,19 @@ public final class MerchantAgentExecutorProducer {
      */
     @Produces
     public AgentExecutor agentExecutor() {
+        // TODO: Inject clientFactory bean when available
+        BiFunction<String, Set<String>, Client> clientFactory = null;
+
+        // Could be configured via @ConfigProperty in the future
+        boolean debugMode = false;
+
         return new MerchantAgentExecutor(
             cartMandateStore,
             agent,
-            agentCard.capabilities().extensions()
+            itemGenerator,
+            agentCard.capabilities().extensions(),
+            clientFactory,
+            debugMode
         );
     }
 
@@ -83,20 +103,34 @@ public final class MerchantAgentExecutorProducer {
      */
     private static class MerchantAgentExecutor extends BaseAgentExecutor {
 
+        private final CartMandateStore cartMandateStore;
         private final Tools tools;
+        private final BiFunction<String, Set<String>, Client> clientFactory;
+        private final boolean debugMode;
+        private final CatalogAgent catalogAgent;
 
         /**
          * Constructor for MerchantAgentExecutor.
          *
          * @param cartMandateStore the cart mandate store instance
          * @param agent the LangChain4j agent for tool selection
+         * @param itemGenerator the LangChain4j agent for generating product items
          * @param supportedExtensions the list of extensions from the agent card
+         * @param clientFactory factory for creating A2A clients
+         * @param debugMode whether debug mode is enabled (defaults to false)
          */
         MerchantAgentExecutor(final CartMandateStore cartMandateStore,
                               final MerchantAgent agent,
-                              final List<AgentExtension> supportedExtensions) {
+                              final ItemGenerator itemGenerator,
+                              final List<AgentExtension> supportedExtensions,
+                              final BiFunction<String, Set<String>, Client> clientFactory,
+                              final boolean debugMode) {
             super(supportedExtensions, agent);
+            this.cartMandateStore = cartMandateStore;
             this.tools = new Tools();
+            this.clientFactory = clientFactory;
+            this.debugMode = debugMode;
+            this.catalogAgent = new CatalogAgent(cartMandateStore, itemGenerator);
         }
 
         @Override
@@ -170,20 +204,16 @@ public final class MerchantAgentExecutorProducer {
 
             // Invoke the selected tool
             // This mirrors the Python implementation's tool dispatch logic
-            // TODO: Implement proper dependency injection for client factory and other dependencies
             switch (toolName.strip()) {
                 case "updateCart":
-                    // TODO: Need to inject shippingAndTaxCalculator and debugMode
-                    logger.warning("updateCart not fully implemented - missing dependencies");
-                    throw new AP2Exception("Tool updateCart requires additional configuration");
+                    tools.updateCart(dataParts, updater, currentTask, cartMandateStore, debugMode);
+                    break;
                 case "findItemsWorkflow":
-                    // TODO: Need to implement catalog agent integration
-                    logger.warning("findItemsWorkflow not implemented - catalog agent integration needed");
-                    throw new AP2Exception("Tool findItemsWorkflow not yet implemented");
+                    catalogAgent.findItemsWorkflow(dataParts, updater, currentTask);
+                    break;
                 case "initiatePayment":
-                    // TODO: Need to inject clientFactory and debugMode
-                    logger.warning("initiatePayment not fully implemented - missing dependencies");
-                    throw new AP2Exception("Tool initiatePayment requires additional configuration");
+                    tools.initiatePayment(dataParts, updater, currentTask, cartMandateStore, clientFactory, debugMode);
+                    break;
                 case "dpcFinish":
                     tools.dpcFinish(dataParts, updater, currentTask);
                     break;
@@ -191,6 +221,23 @@ public final class MerchantAgentExecutorProducer {
                     throw new AP2Exception(
                         "Unknown tool selected: " + toolName + ". " +
                         "Unable to determine appropriate tool for request.");
+            }
+        }
+
+        /**
+         * A helper function to fail a task with a given error message.
+         *
+         * @param updater The TaskUpdater instance
+         * @param errorText The error message
+         */
+        @Override
+        protected void failTask(TaskUpdater updater, String errorText) {
+            try {
+                Message errorMessage = updater.newAgentMessage(
+                        List.of(new TextPart(errorText)), null);
+                updater.fail(errorMessage);
+            } catch (Exception e) {
+                logger.severe("Failed to fail task: " + e.getMessage());
             }
         }
     }
