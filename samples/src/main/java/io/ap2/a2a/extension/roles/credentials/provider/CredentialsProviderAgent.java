@@ -2,6 +2,7 @@ package io.ap2.a2a.extension.roles.credentials.provider;
 
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.UserMessage;
+import io.ap2.a2a.extension.common.ToolSelectorAgent;
 import io.ap2.a2a.extension.common.SystemUtils;
 import io.quarkiverse.langchain4j.RegisterAiService;
 
@@ -10,7 +11,7 @@ import io.quarkiverse.langchain4j.RegisterAiService;
  * This agent uses an LLM to intelligently select the appropriate tool based on the user's request.
  */
 @RegisterAiService
-public interface CredentialsProviderAgent {
+public interface CredentialsProviderAgent extends ToolSelectorAgent {
 
     /**
      * System message that guides the AI in selecting the appropriate tool.
@@ -32,5 +33,6 @@ public interface CredentialsProviderAgent {
         - handleSignedPaymentMandate: Process a signed payment mandate (requires: payment_mandate)
 
         """ + SystemUtils.DEBUG_MODE_INSTRUCTIONS)
+    @Override
     String selectTool(@UserMessage String prompt);
 }
