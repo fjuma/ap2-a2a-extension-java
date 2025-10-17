@@ -15,8 +15,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import java.util.List;
-import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.logging.Logger;
 
 /**
@@ -48,16 +46,12 @@ public final class MerchantPaymentProcessorAgentExecutorProducer {
      */
     @Produces
     public AgentExecutor agentExecutor() {
-        // TODO: Inject clientFactory bean when available
-        BiFunction<String, Set<String>, Client> clientFactory = null;
-
         // Could be configured via @ConfigProperty in the future
         boolean debugMode = false;
 
         return new MerchantPaymentProcessorAgentExecutor(
             agent,
             agentCard.capabilities().extensions(),
-            clientFactory,
             debugMode
         );
     }
@@ -79,7 +73,6 @@ public final class MerchantPaymentProcessorAgentExecutorProducer {
     private static class MerchantPaymentProcessorAgentExecutor extends BaseAgentExecutor {
 
         private final Tools tools;
-        private final BiFunction<String, Set<String>, Client> clientFactory;
         private final boolean debugMode;
 
         /**
@@ -87,17 +80,14 @@ public final class MerchantPaymentProcessorAgentExecutorProducer {
          *
          * @param agent the LangChain4j agent for tool selection
          * @param supportedExtensions the list of extensions from the agent card
-         * @param clientFactory factory for creating A2A clients
          * @param debugMode whether debug mode is enabled (defaults to false)
          */
         MerchantPaymentProcessorAgentExecutor(
                 final MerchantPaymentProcessorAgent agent,
                 final List<AgentExtension> supportedExtensions,
-                final BiFunction<String, Set<String>, Client> clientFactory,
                 final boolean debugMode) {
             super(supportedExtensions, agent);
             this.tools = new Tools();
-            this.clientFactory = clientFactory;
             this.debugMode = debugMode;
         }
 
@@ -118,7 +108,7 @@ public final class MerchantPaymentProcessorAgentExecutorProducer {
             // This mirrors the Python implementation's tool dispatch logic
             switch (toolName.trim()) {
                 case "initiatePayment":
-                    tools.initiatePayment(dataParts, updater, currentTask, clientFactory, debugMode);
+                    tools.initiatePayment(dataParts, updater, currentTask, debugMode);
                     break;
                 default:
                     throw new AP2Exception(

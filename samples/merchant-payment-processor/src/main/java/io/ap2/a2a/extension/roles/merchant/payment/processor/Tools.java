@@ -9,7 +9,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -26,6 +25,7 @@ import io.a2a.spec.TaskState;
 import io.a2a.spec.TextPart;
 import io.ap2.a2a.extension.common.A2aMessageBuilder;
 import io.ap2.a2a.extension.common.MessageUtils;
+import io.ap2.a2a.extension.common.PaymentRemoteA2aClient;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.PaymentMandate;
 
@@ -45,7 +45,6 @@ public class Tools {
      * @param dataParts The data parts from the request, expected to contain a PaymentMandate.
      * @param updater The TaskUpdater instance for updating the task state.
      * @param currentTask The current task, or null if this is a new payment.
-     * @param clientFactory A function that creates an A2A client given a base URL and set of required extensions.
      * @param debugMode Whether the agent is in debug mode.
      * @throws AP2Exception if required data is missing or invalid
      */
@@ -53,7 +52,6 @@ public class Tools {
             List<DataPart> dataParts,
             TaskUpdater updater,
             Task currentTask,
-            BiFunction<String, Set<String>, Client> clientFactory,
             boolean debugMode) throws AP2Exception {
 
         PaymentMandate paymentMandate = MessageUtils.parseCanonicalObject(
@@ -70,7 +68,7 @@ public class Tools {
             challengeResponse = "";
         }
 
-        handlePaymentMandate(paymentMandate, challengeResponse, updater, currentTask, clientFactory, debugMode);
+        handlePaymentMandate(paymentMandate, challengeResponse, updater, currentTask, debugMode);
     }
 
     /**
@@ -83,7 +81,6 @@ public class Tools {
      * @param challengeResponse The response to a transaction challenge, if any.
      * @param updater The task updater for managing task state.
      * @param currentTask The current task, or null if it's a new payment.
-     * @param clientFactory A function that creates an A2A client.
      * @param debugMode Whether the agent is in debug mode.
      * @throws AP2Exception if there's an error processing the payment
      */
@@ -92,7 +89,6 @@ public class Tools {
             String challengeResponse,
             TaskUpdater updater,
             Task currentTask,
-            BiFunction<String, Set<String>, Client> clientFactory,
             boolean debugMode) throws AP2Exception {
 
         if (currentTask == null) {
@@ -102,7 +98,7 @@ public class Tools {
 
         if (currentTask.getStatus().state() == TaskState.INPUT_REQUIRED) {
             checkChallengeResponseAndCompletePayment(
-                    paymentMandate, challengeResponse, updater, clientFactory, debugMode);
+                    paymentMandate, challengeResponse, updater, debugMode);
         }
     }
 
@@ -143,7 +139,6 @@ public class Tools {
      * @param paymentMandate The payment mandate.
      * @param challengeResponse The challenge response.
      * @param updater The task updater.
-     * @param clientFactory A function that creates an A2A client.
      * @param debugMode Whether the agent is in debug mode.
      * @throws AP2Exception if there's an error processing the payment
      */
@@ -151,11 +146,10 @@ public class Tools {
             PaymentMandate paymentMandate,
             String challengeResponse,
             TaskUpdater updater,
-            BiFunction<String, Set<String>, Client> clientFactory,
             boolean debugMode) throws AP2Exception {
 
         if (challengeResponseIsValid(challengeResponse)) {
-            completePayment(paymentMandate, updater, clientFactory, debugMode);
+            completePayment(paymentMandate, updater, debugMode);
             return;
         }
 
@@ -169,18 +163,16 @@ public class Tools {
      *
      * @param paymentMandate The payment mandate.
      * @param updater The task updater.
-     * @param clientFactory A function that creates an A2A client.
      * @param debugMode Whether the agent is in debug mode.
      * @throws AP2Exception if there's an error completing the payment
      */
     private void completePayment(
             PaymentMandate paymentMandate,
             TaskUpdater updater,
-            BiFunction<String, Set<String>, Client> clientFactory,
             boolean debugMode) throws AP2Exception {
 
         String paymentMandateId = paymentMandate.paymentMandateContents().paymentMandateId();
-        String paymentCredential = requestPaymentCredential(paymentMandate, updater, clientFactory, debugMode);
+        String paymentCredential = requestPaymentCredential(paymentMandate, updater, debugMode);
 
         logger.info("Calling issuer to complete payment for " + paymentMandateId +
                 " with payment credential " + paymentCredential + "...");
@@ -206,7 +198,6 @@ public class Tools {
      *
      * @param paymentMandate The PaymentMandate containing payment details.
      * @param updater The task updater.
-     * @param clientFactory A function that creates an A2A client.
      * @param debugMode Whether the agent is in debug mode.
      * @return The payment credential details.
      * @throws AP2Exception if the payment method data cannot be found
@@ -214,7 +205,6 @@ public class Tools {
     private String requestPaymentCredential(
             PaymentMandate paymentMandate,
             TaskUpdater updater,
-            BiFunction<String, Set<String>, Client> clientFactory,
             boolean debugMode) throws AP2Exception {
 
         Map<String, Object> details = paymentMandate.paymentMandateContents()
@@ -231,7 +221,19 @@ public class Tools {
             throw new AP2Exception("Credentials provider URL not found in token");
         }
 
-        Client credentialsProvider = clientFactory.apply(credentialsProviderUrl, Set.of(EXTENSION_URI));
+        // Create a PaymentRemoteA2aClient for the credentials provider
+        PaymentRemoteA2aClient remoteClient = new PaymentRemoteA2aClient(
+                "credentials_provider",
+                credentialsProviderUrl,
+                Set.of(EXTENSION_URI)
+        );
+
+        Client credentialsProvider;
+        try {
+            credentialsProvider = remoteClient.getA2aClient(List.of());
+        } catch (Exception e) {
+            throw new AP2Exception("Failed to create credentials provider client: " + e.getMessage(), e);
+        }
 
         A2aMessageBuilder messageBuilder = new A2aMessageBuilder()
                 .setContextId(updater.getContextId())

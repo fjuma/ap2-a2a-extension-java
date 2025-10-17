@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
@@ -26,6 +25,7 @@ import io.a2a.spec.Task;
 import io.a2a.spec.TextPart;
 import io.ap2.a2a.extension.common.A2aMessageBuilder;
 import io.ap2.a2a.extension.common.MessageUtils;
+import io.ap2.a2a.extension.common.PaymentRemoteA2aClient;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.CartContents;
 import io.ap2.a2a.extension.spec.CartMandate;
@@ -202,7 +202,6 @@ public class Tools {
      * @param updater The TaskUpdater instance for updating the task state.
      * @param currentTask The current task, used to find the processor's task ID.
      * @param cartMandateStore The cart mandate store for storing risk data.
-     * @param clientFactory A function that creates an A2A client given a base URL and set of required extensions.
      * @param debugMode Whether the agent is in debug mode.
      * @throws AP2Exception if required data is missing
      */
@@ -211,7 +210,6 @@ public class Tools {
             TaskUpdater updater,
             Task currentTask,
             CartMandateStore cartMandateStore,
-            BiFunction<String, Set<String>, Client> clientFactory,
             boolean debugMode) throws AP2Exception {
 
         PaymentMandate paymentMandate = MessageUtils.parseCanonicalObject(
@@ -236,8 +234,20 @@ public class Tools {
             return;
         }
 
-        // Create the payment processor client
-        Client paymentProcessorAgent = clientFactory.apply(processorUrl, Set.of(EXTENSION_URI));
+        // Create the payment processor client using PaymentRemoteA2aClient
+        PaymentRemoteA2aClient remoteClient = new PaymentRemoteA2aClient(
+                "merchant_payment_processor",
+                processorUrl,
+                Set.of(EXTENSION_URI)
+        );
+
+        Client paymentProcessorAgent;
+        try {
+            paymentProcessorAgent = remoteClient.getA2aClient(List.of());
+        } catch (Exception e) {
+            failTask(updater, "Failed to create payment processor client: " + e.getMessage());
+            return;
+        }
 
         // Build the message to send to the payment processor
         A2aMessageBuilder messageBuilder = new A2aMessageBuilder()

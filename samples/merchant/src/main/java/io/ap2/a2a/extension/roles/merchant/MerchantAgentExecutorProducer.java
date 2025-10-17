@@ -20,7 +20,6 @@ import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
 import java.util.List;
 import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.logging.Logger;
 
 /**
@@ -72,9 +71,6 @@ public final class MerchantAgentExecutorProducer {
      */
     @Produces
     public AgentExecutor agentExecutor() {
-        // TODO: Inject clientFactory bean when available
-        BiFunction<String, Set<String>, Client> clientFactory = null;
-
         // Could be configured via @ConfigProperty in the future
         boolean debugMode = false;
 
@@ -83,7 +79,6 @@ public final class MerchantAgentExecutorProducer {
             agent,
             itemGenerator,
             agentCard.capabilities().extensions(),
-            clientFactory,
             debugMode
         );
     }
@@ -105,7 +100,6 @@ public final class MerchantAgentExecutorProducer {
 
         private final CartMandateStore cartMandateStore;
         private final Tools tools;
-        private final BiFunction<String, Set<String>, Client> clientFactory;
         private final boolean debugMode;
         private final CatalogAgent catalogAgent;
 
@@ -116,19 +110,16 @@ public final class MerchantAgentExecutorProducer {
          * @param agent the LangChain4j agent for tool selection
          * @param itemGenerator the LangChain4j agent for generating product items
          * @param supportedExtensions the list of extensions from the agent card
-         * @param clientFactory factory for creating A2A clients
          * @param debugMode whether debug mode is enabled (defaults to false)
          */
         MerchantAgentExecutor(final CartMandateStore cartMandateStore,
                               final MerchantAgent agent,
                               final ItemGenerator itemGenerator,
                               final List<AgentExtension> supportedExtensions,
-                              final BiFunction<String, Set<String>, Client> clientFactory,
                               final boolean debugMode) {
             super(supportedExtensions, agent);
             this.cartMandateStore = cartMandateStore;
             this.tools = new Tools();
-            this.clientFactory = clientFactory;
             this.debugMode = debugMode;
             this.catalogAgent = new CatalogAgent(cartMandateStore, itemGenerator);
         }
@@ -212,7 +203,7 @@ public final class MerchantAgentExecutorProducer {
                     catalogAgent.findItemsWorkflow(dataParts, updater, currentTask);
                     break;
                 case "initiatePayment":
-                    tools.initiatePayment(dataParts, updater, currentTask, cartMandateStore, clientFactory, debugMode);
+                    tools.initiatePayment(dataParts, updater, currentTask, cartMandateStore, debugMode);
                     break;
                 case "dpcFinish":
                     tools.dpcFinish(dataParts, updater, currentTask);

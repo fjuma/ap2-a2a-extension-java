@@ -17,6 +17,7 @@ import java.util.logging.Logger;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import dev.langchain4j.agent.tool.Tool;
 import io.a2a.client.Client;
 import io.a2a.client.ClientEvent;
 import io.a2a.client.TaskEvent;
@@ -56,6 +57,55 @@ public class Tools {
     @Inject
     PaymentMethodCollectorAgent paymentMethodCollectorAgent;
 
+    private Map<String, Object> state;
+    private Client merchantClient;
+    private Client credentialsProviderClient;
+    private boolean debugMode;
+
+    /**
+     * Initializes the tools with required context.
+     * Must be called before tools can be invoked by the AI agent.
+     *
+     * @param state the shared state map
+     * @param debugMode whether debug mode is enabled
+     */
+    public void initialize(Map<String, Object> state, boolean debugMode) {
+        this.state = state;
+        this.debugMode = debugMode;
+    }
+
+    /**
+     * Gets or creates the merchant client from the registry.
+     *
+     * @return the merchant agent client
+     */
+    private Client getMerchantClient() {
+        if (merchantClient == null) {
+            try {
+                merchantClient = RemoteClientRegistry.MERCHANT_AGENT_CLIENT.getA2aClient(List.of());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create merchant client", e);
+            }
+        }
+        return merchantClient;
+    }
+
+    /**
+     * Gets or creates the credentials provider client from the registry.
+     *
+     * @return the credentials provider client
+     */
+    private Client getCredentialsProviderClient() {
+        if (credentialsProviderClient == null) {
+            try {
+                credentialsProviderClient = RemoteClientRegistry.CREDENTIALS_PROVIDER_CLIENT.getA2aClient(List.of());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create credentials provider client", e);
+            }
+        }
+        return credentialsProviderClient;
+    }
+
     /**
      * Delegates to the shopper agent to help the user shop for products.
      *
@@ -90,17 +140,11 @@ public class Tools {
      * Notifies the merchant agent of a shipping address selection for a cart.
      *
      * @param shippingAddress The user's selected shipping address.
-     * @param state The state map for managing tool context.
-     * @param merchantClient The merchant agent client.
-     * @param debugMode Whether the agent is in debug mode.
      * @return The updated CartMandate.
      * @throws AP2Exception if required state is missing or operation fails
      */
-    public CartMandate updateCart(
-            ContactAddress shippingAddress,
-            Map<String, Object> state,
-            Client merchantClient,
-            boolean debugMode) throws AP2Exception {
+    @Tool("Update the cart with the user's shipping address")
+    public CartMandate updateCart(ContactAddress shippingAddress) throws AP2Exception {
 
         String chosenCartId = (String) state.get("chosen_cart_id");
         if (chosenCartId == null) {
@@ -137,7 +181,7 @@ public class Tools {
         };
 
         try {
-            merchantClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
+            getMerchantClient().sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
             throw new AP2Exception("Failed to update cart: " + e.getMessage(), e);
         }
@@ -156,16 +200,11 @@ public class Tools {
     /**
      * Initiates a payment using the payment mandate from state.
      *
-     * @param state The state map for managing tool context.
-     * @param merchantClient The merchant agent client.
-     * @param debugMode Whether the agent is in debug mode.
      * @return The status of the payment initiation.
      * @throws AP2Exception if required state is missing or operation fails
      */
-    public TaskStatus initiatePayment(
-            Map<String, Object> state,
-            Client merchantClient,
-            boolean debugMode) throws AP2Exception {
+    @Tool("Initiate a payment using the signed payment mandate")
+    public TaskStatus initiatePayment() throws AP2Exception {
 
         PaymentMandate paymentMandate = (PaymentMandate) state.get("signed_payment_mandate");
         if (paymentMandate == null) {
@@ -204,7 +243,7 @@ public class Tools {
         };
 
         try {
-            merchantClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
+            getMerchantClient().sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
             throw new AP2Exception("Failed to initiate payment: " + e.getMessage(), e);
         }
@@ -222,17 +261,11 @@ public class Tools {
      * In our sample, the challenge response is a one-time password (OTP) sent to the user.
      *
      * @param challengeResponse The challenge response.
-     * @param state The state map for managing tool context.
-     * @param merchantClient The merchant agent client.
-     * @param debugMode Whether the agent is in debug mode.
      * @return The status of the payment initiation.
      * @throws AP2Exception if required state is missing or operation fails
      */
-    public TaskStatus initiatePaymentWithOtp(
-            String challengeResponse,
-            Map<String, Object> state,
-            Client merchantClient,
-            boolean debugMode) throws AP2Exception {
+    @Tool("Initiate a payment with the OTP challenge response")
+    public TaskStatus initiatePaymentWithOtp(String challengeResponse) throws AP2Exception {
 
         PaymentMandate paymentMandate = (PaymentMandate) state.get("signed_payment_mandate");
         if (paymentMandate == null) {
@@ -272,7 +305,7 @@ public class Tools {
         };
 
         try {
-            merchantClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
+            getMerchantClient().sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
             throw new AP2Exception("Failed to initiate payment with OTP: " + e.getMessage(), e);
         }
@@ -285,14 +318,13 @@ public class Tools {
      *
      * @param paymentMethodAlias The payment method alias.
      * @param userEmail The user's email address.
-     * @param state The state map for managing tool context.
      * @return The payment mandate.
      * @throws AP2Exception if required state is missing
      */
+    @Tool("Create a payment mandate with the user's payment method and email")
     public PaymentMandate createPaymentMandate(
             String paymentMethodAlias,
-            String userEmail,
-            Map<String, Object> state) throws AP2Exception {
+            String userEmail) throws AP2Exception {
 
         CartMandate cartMandate = (CartMandate) state.get("cart_mandate");
         if (cartMandate == null) {
@@ -340,11 +372,11 @@ public class Tools {
      * cryptographic operations. It simulates the creation of a signature by
      * concatenating the mandate hashes.
      *
-     * @param state The state map for managing tool context.
      * @return A string representing the simulated user authorization signature (JWT).
      * @throws AP2Exception if required state is missing
      */
-    public String signMandatesOnUserDevice(Map<String, Object> state) throws AP2Exception {
+    @Tool("Sign the payment and cart mandates on the user's secure device")
+    public String signMandatesOnUserDevice() throws AP2Exception {
         PaymentMandate paymentMandate = (PaymentMandate) state.get("payment_mandate");
         if (paymentMandate == null) {
             throw new AP2Exception("No payment mandate found in tool context state.");
@@ -375,16 +407,11 @@ public class Tools {
     /**
      * Sends the signed payment mandate to the credentials provider.
      *
-     * @param state The state map for managing tool context.
-     * @param credentialsProviderClient The credentials provider client.
-     * @param debugMode Whether the agent is in debug mode.
      * @return The task from the credentials provider.
      * @throws AP2Exception if required state is missing or operation fails
      */
-    public Task sendSignedPaymentMandateToCredentialsProvider(
-            Map<String, Object> state,
-            Client credentialsProviderClient,
-            boolean debugMode) throws AP2Exception {
+    @Tool("Send the signed payment mandate to the credentials provider")
+    public Task sendSignedPaymentMandateToCredentialsProvider() throws AP2Exception {
 
         PaymentMandate paymentMandate = (PaymentMandate) state.get("signed_payment_mandate");
         if (paymentMandate == null) {
@@ -419,7 +446,7 @@ public class Tools {
         };
 
         try {
-            credentialsProviderClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
+            getCredentialsProviderClient().sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
             throw new AP2Exception("Failed to send signed payment mandate: " + e.getMessage(), e);
         }

@@ -18,6 +18,7 @@ import io.a2a.spec.Artifact;
 import io.a2a.spec.Task;
 import io.ap2.a2a.extension.common.A2aMessageBuilder;
 import io.ap2.a2a.extension.common.ArtifactUtils;
+import io.ap2.a2a.extension.roles.shopping.RemoteClientRegistry;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.ContactAddress;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -43,11 +44,25 @@ public class Tools {
      * Must be called before tools can be invoked by the AI agent.
      *
      * @param state the shared state map
-     * @param credentialsProviderClient the credentials provider client
      */
-    public void initialize(Map<String, Object> state, Client credentialsProviderClient) {
+    public void initialize(Map<String, Object> state) {
         this.state = state;
-        this.credentialsProviderClient = credentialsProviderClient;
+    }
+
+    /**
+     * Gets or creates the credentials provider client from the registry.
+     *
+     * @return the credentials provider client
+     */
+    private Client getCredentialsProviderClient() {
+        if (credentialsProviderClient == null) {
+            try {
+                credentialsProviderClient = RemoteClientRegistry.CREDENTIALS_PROVIDER_CLIENT.getA2aClient(List.of());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create credentials provider client", e);
+            }
+        }
+        return credentialsProviderClient;
     }
 
     /**
@@ -86,7 +101,7 @@ public class Tools {
         };
 
         try {
-            credentialsProviderClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
+            getCredentialsProviderClient().sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
             throw new RuntimeException("Failed to get shipping address: " + e.getMessage(), e);
         }

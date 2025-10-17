@@ -22,6 +22,7 @@ import io.a2a.spec.Task;
 import io.a2a.spec.TaskStatus;
 import io.ap2.a2a.extension.common.A2aMessageBuilder;
 import io.ap2.a2a.extension.common.ArtifactUtils;
+import io.ap2.a2a.extension.roles.shopping.RemoteClientRegistry;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.CartMandate;
 import io.ap2.a2a.extension.spec.IntentMandate;
@@ -49,13 +50,27 @@ public class Tools {
      * Must be called before tools can be invoked by the AI agent.
      *
      * @param state the shared state map
-     * @param merchantClient the merchant agent client
      * @param debugMode whether debug mode is enabled
      */
-    public void initialize(Map<String, Object> state, Client merchantClient, boolean debugMode) {
+    public void initialize(Map<String, Object> state, boolean debugMode) {
         this.state = state;
-        this.merchantClient = merchantClient;
         this.debugMode = debugMode;
+    }
+
+    /**
+     * Gets or creates the merchant client from the registry.
+     *
+     * @return the merchant agent client
+     */
+    private Client getMerchantClient() {
+        if (merchantClient == null) {
+            try {
+                merchantClient = RemoteClientRegistry.MERCHANT_AGENT_CLIENT.getA2aClient(List.of());
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to create merchant client", e);
+            }
+        }
+        return merchantClient;
     }
 
     /**
@@ -137,7 +152,7 @@ public class Tools {
         };
 
         try {
-            merchantClient.sendMessage(messageBuilder.build(), consumers, errorHandler, null);
+            getMerchantClient().sendMessage(messageBuilder.build(), consumers, errorHandler, null);
         } catch (Exception e) {
             throw new RuntimeException("Failed to find products: " + e.getMessage(), e);
         }
