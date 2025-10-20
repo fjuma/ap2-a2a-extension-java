@@ -6,6 +6,7 @@ import static io.ap2.a2a.extension.spec.AP2Constants.INTENT_MANDATE_DATA_KEY;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -26,7 +27,7 @@ import io.ap2.a2a.extension.roles.shopping.RemoteClientRegistry;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.CartMandate;
 import io.ap2.a2a.extension.spec.IntentMandate;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.RequestScoped;
 
 /**
  * Tools used by the shopper subagent.
@@ -36,26 +37,13 @@ import jakarta.enterprise.context.ApplicationScoped;
  * <p>
  * This class provides LangChain4j @Tool annotated methods for AI agent invocation.
  */
-@ApplicationScoped
+@RequestScoped
 public class Tools {
 
     private static final Logger logger = Logger.getLogger(Tools.class.getName());
 
-    private Map<String, Object> state;
+    private final Map<String, Object> state = new HashMap<>();
     private Client merchantClient;
-    private boolean debugMode;
-
-    /**
-     * Initializes the tools with required context.
-     * Must be called before tools can be invoked by the AI agent.
-     *
-     * @param state the shared state map
-     * @param debugMode whether debug mode is enabled
-     */
-    public void initialize(Map<String, Object> state, boolean debugMode) {
-        this.state = state;
-        this.debugMode = debugMode;
-    }
 
     /**
      * Gets or creates the merchant client from the registry.
@@ -128,7 +116,7 @@ public class Tools {
                 .addText("Find products that match the user's IntentMandate.")
                 .addData(INTENT_MANDATE_DATA_KEY, intentMandate)
                 .addData("risk_data", riskData)
-                .addData("debug_mode", debugMode)
+                .addData("debug_mode", false)
                 .addData("shopping_agent_id", "trusted_shopping_agent");
 
         List<CartMandate>[] cartMandatesHolder = new List[1];

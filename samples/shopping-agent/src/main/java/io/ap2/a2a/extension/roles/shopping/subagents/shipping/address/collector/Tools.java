@@ -3,6 +3,7 @@ package io.ap2.a2a.extension.roles.shopping.subagents.shipping.address.collector
 import static io.ap2.a2a.extension.spec.AP2Constants.CONTACT_ADDRESS_DATA_KEY;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -21,7 +22,7 @@ import io.ap2.a2a.extension.common.ArtifactUtils;
 import io.ap2.a2a.extension.roles.shopping.RemoteClientRegistry;
 import io.ap2.a2a.extension.spec.AP2Exception;
 import io.ap2.a2a.extension.spec.ContactAddress;
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.RequestScoped;
 
 /**
  * Tools used by the shipping address collector subagent.
@@ -31,23 +32,13 @@ import jakarta.enterprise.context.ApplicationScoped;
  * <p>
  * This class provides LangChain4j @Tool annotated methods for AI agent invocation.
  */
-@ApplicationScoped
+@RequestScoped
 public class Tools {
 
     private static final Logger logger = Logger.getLogger(Tools.class.getName());
 
-    private Map<String, Object> state;
+    private final Map<String, Object> state = new HashMap<>();
     private Client credentialsProviderClient;
-
-    /**
-     * Initializes the tools with required context.
-     * Must be called before tools can be invoked by the AI agent.
-     *
-     * @param state the shared state map
-     */
-    public void initialize(Map<String, Object> state) {
-        this.state = state;
-    }
 
     /**
      * Gets or creates the credentials provider client from the registry.

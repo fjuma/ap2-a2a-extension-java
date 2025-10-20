@@ -5,6 +5,7 @@ import static io.ap2.a2a.extension.spec.AP2Constants.PAYMENT_MANDATE_DATA_KEY;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -14,7 +15,7 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.logging.Logger;
 
-import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.context.RequestScoped;
 import jakarta.inject.Inject;
 
 import dev.langchain4j.agent.tool.Tool;
@@ -43,7 +44,7 @@ import io.ap2.a2a.extension.roles.shopping.subagents.shopper.ShopperAgent;
  * Each agent uses individual tools to handle distinct tasks throughout the
  * shopping and purchasing process, such as updating a cart or initiating payment.
  */
-@ApplicationScoped
+@RequestScoped
 public class Tools {
 
     private static final Logger logger = Logger.getLogger(Tools.class.getName());
@@ -57,22 +58,9 @@ public class Tools {
     @Inject
     PaymentMethodCollectorAgent paymentMethodCollectorAgent;
 
-    private Map<String, Object> state;
+    private final Map<String, Object> state = new HashMap<>();
     private Client merchantClient;
     private Client credentialsProviderClient;
-    private boolean debugMode;
-
-    /**
-     * Initializes the tools with required context.
-     * Must be called before tools can be invoked by the AI agent.
-     *
-     * @param state the shared state map
-     * @param debugMode whether debug mode is enabled
-     */
-    public void initialize(Map<String, Object> state, boolean debugMode) {
-        this.state = state;
-        this.debugMode = debugMode;
-    }
 
     /**
      * Gets or creates the merchant client from the registry.
@@ -159,7 +147,7 @@ public class Tools {
                 .addData("cart_id", chosenCartId)
                 .addData("shipping_address", shippingAddress)
                 .addData("shopping_agent_id", "trusted_shopping_agent")
-                .addData("debug_mode", debugMode);
+                .addData("debug_mode", false);
 
         CartMandate[] updatedCartMandateHolder = new CartMandate[1];
         List<BiConsumer<ClientEvent, AgentCard>> consumers = new ArrayList<>();
@@ -224,7 +212,7 @@ public class Tools {
                 .addData(PAYMENT_MANDATE_DATA_KEY, paymentMandate)
                 .addData("risk_data", riskData)
                 .addData("shopping_agent_id", "trusted_shopping_agent")
-                .addData("debug_mode", debugMode);
+                .addData("debug_mode", false);
 
         TaskStatus[] statusHolder = new TaskStatus[1];
         String[] taskIdHolder = new String[1];
@@ -288,7 +276,7 @@ public class Tools {
                 .addData("shopping_agent_id", "trusted_shopping_agent")
                 .addData("challenge_response", challengeResponse)
                 .addData("risk_data", riskData)
-                .addData("debug_mode", debugMode);
+                .addData("debug_mode", false);
 
         TaskStatus[] statusHolder = new TaskStatus[1];
         List<BiConsumer<ClientEvent, AgentCard>> consumers = new ArrayList<>();
@@ -430,7 +418,7 @@ public class Tools {
                 .addText("This is the signed payment mandate")
                 .addData(PAYMENT_MANDATE_DATA_KEY, paymentMandate)
                 .addData("risk_data", riskData)
-                .addData("debug_mode", debugMode);
+                .addData("debug_mode", false);
 
         Task[] taskHolder = new Task[1];
         List<BiConsumer<ClientEvent, AgentCard>> consumers = new ArrayList<>();
